@@ -206,5 +206,11 @@ main() {
 # Handle cleanup on exit - don't kill tmux session, just exit picker
 trap 'echo ""; exit 0' EXIT INT TERM
 
+# If an existing tmux session is running, reattach immediately.
+# This handles WebSocket reconnects seamlessly without re-prompting.
+if check_existing_session; then
+    exec tmux attach-session -t "$TMUX_SESSION_NAME"
+fi
+
 # Run main function
 main "$@"

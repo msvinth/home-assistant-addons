@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0
+
+### 🔧 Stability Fixes
+- **Stable WebSocket connections**: Terminal sessions survive browser navigation and connection drops
+  - tmux sessions persist through WebSocket disconnects (SIGHUP handled cleanly)
+  - Automatic reattach on reconnect — no re-prompting or welcome screen replay
+  - Claude exit drops to bash shell instead of killing the session
+  - Faster reconnect (3s interval) with unlimited retries
+- **Dynamic changelog in welcome screen**: What's New section now reads from CHANGELOG.md
+  - No more hardcoded version entries — just update CHANGELOG.md
+  - Shows cumulative changes for users who skip versions
+  - Capped at 5 most recent entries with overflow indicator
+- **Welcome screen improvements**: Auto-continues after 15s timeout, fixed box alignment
+
 ## 2.1.0
 
 ### ✨ New Features

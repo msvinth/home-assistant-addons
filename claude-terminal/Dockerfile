@@ -30,9 +30,10 @@ RUN npm install -g @anthropic-ai/claude-code@latest \
 RUN mkdir -p /config/claude-config
 WORKDIR /config
 
-# Copy startup script and modular scripts
+# Copy startup script, modular scripts, and changelog
 COPY run.sh /run.sh
 COPY scripts/ /opt/scripts/
+COPY CHANGELOG.md /opt/scripts/CHANGELOG.md
 RUN chmod +x /run.sh \
     && chmod +x /opt/scripts/*.sh
 

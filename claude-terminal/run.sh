@@ -224,6 +224,16 @@ setup_session_picker() {
         fi
     fi
 
+    # Setup terminal launcher script (handles reconnection gracefully)
+    if [ -f "/opt/scripts/terminal-launcher.sh" ]; then
+        if cp /opt/scripts/terminal-launcher.sh /usr/local/bin/terminal-launcher; then
+            chmod +x /usr/local/bin/terminal-launcher
+            bashio::log.info "Terminal launcher script installed successfully"
+        else
+            bashio::log.warning "Failed to copy terminal-launcher script"
+        fi
+    fi
+
     # Setup ha-context script
     if [ -f "/opt/scripts/ha-context.sh" ]; then
         if cp /opt/scripts/ha-context.sh /usr/local/bin/ha-context; then
@@ -264,30 +274,37 @@ generate_ha_context() {
 }
 
 # Determine Claude launch command based on configuration
+# Returns either a direct executable path or a bash -c command string
 get_claude_launch_command() {
     local auto_launch_claude
 
     # Get configuration value, default to true for backward compatibility
     auto_launch_claude=$(bashio::config 'auto_launch_claude' 'true')
 
-    # Prepend welcome banner if available (runs inside ttyd, user-visible)
-    local welcome_prefix=""
-    if [ -f /usr/local/bin/welcome ]; then
-        welcome_prefix="welcome; "
-    fi
-
     if [ "$auto_launch_claude" = "true" ]; then
-        # Use tmux for session persistence - attach to existing or create new
-        echo "${welcome_prefix}tmux new-session -A -s claude 'claude'"
+        # Use terminal-launcher for robust session management:
+        # - Skips welcome on reconnect (reattaches to existing tmux)
+        # - Falls back to bash if claude exits (session stays alive)
+        # - exec's tmux directly so SIGHUP causes clean detach
+        if [ -f /usr/local/bin/terminal-launcher ]; then
+            echo "direct:/usr/local/bin/terminal-launcher"
+        else
+            bashio::log.warning "Terminal launcher not found, using basic command"
+            echo "shell:tmux new-session -A -s claude 'claude'"
+        fi
     else
         # Session picker manages its own tmux sessions internally,
         # so do NOT wrap it in tmux (that would cause nested tmux errors)
         if [ -f /usr/local/bin/claude-session-picker ]; then
-            echo "${welcome_prefix}/usr/local/bin/claude-session-picker"
+            echo "direct:/usr/local/bin/claude-session-picker"
         else
             # Fallback if session picker is missing
             bashio::log.warning "Session picker not found, falling back to auto-launch"
-            echo "${welcome_prefix}tmux new-session -A -s claude 'claude'"
+            if [ -f /usr/local/bin/terminal-launcher ]; then
+                echo "direct:/usr/local/bin/terminal-launcher"
+            else
+                echo "shell:tmux new-session -A -s claude 'claude'"
+            fi
         fi
     fi
 }
@@ -304,8 +321,8 @@ start_web_terminal() {
     bashio::log.info "HOME=${HOME}"
 
     # Get the appropriate launch command based on configuration
-    local launch_command
-    launch_command=$(get_claude_launch_command)
+    local launch_spec
+    launch_spec=$(get_claude_launch_command)
     
     # Log the configuration being used
     local auto_launch_claude
@@ -319,19 +336,44 @@ start_web_terminal() {
     # Terminal theme - dark palette with terracotta accents (#d97757)
     local ttyd_theme='{"background":"#1a1b26","foreground":"#c0caf5","cursor":"#d97757","cursorAccent":"#1a1b26","selectionBackground":"#33467c","selectionForeground":"#c0caf5","black":"#15161e","red":"#f7768e","green":"#9ece6a","yellow":"#e0af68","blue":"#7aa2f7","magenta":"#bb9af7","cyan":"#7dcfff","white":"#a9b1d6","brightBlack":"#414868","brightRed":"#f7768e","brightGreen":"#9ece6a","brightYellow":"#e0af68","brightBlue":"#7aa2f7","brightMagenta":"#bb9af7","brightCyan":"#7dcfff","brightWhite":"#c0caf5"}'
 
+    # Parse launch spec - "direct:/path" runs the executable directly,
+    # "shell:command" wraps in bash -c for compound commands
+    local launch_type="${launch_spec%%:*}"
+    local launch_command="${launch_spec#*:}"
+
+    bashio::log.info "Launch mode: ${launch_type}, command: ${launch_command}"
+
     # Run ttyd with keepalive configuration to prevent WebSocket disconnects
     # See: https://github.com/heytcass/home-assistant-addons/issues/24
-    exec ttyd \
-        --port "${port}" \
-        --interface 0.0.0.0 \
-        --writable \
-        --ping-interval 30 \
-        --client-option enableReconnect=true \
-        --client-option reconnect=10 \
-        --client-option reconnectInterval=5 \
-        --client-option "theme=${ttyd_theme}" \
-        --client-option fontSize=14 \
-        bash -c "$launch_command"
+    if [ "$launch_type" = "direct" ]; then
+        # Direct executable - no bash -c wrapper.
+        # This lets the script exec into tmux, so SIGHUP from ttyd goes
+        # straight to tmux which detaches cleanly (session survives).
+        exec ttyd \
+            --port "${port}" \
+            --interface 0.0.0.0 \
+            --writable \
+            --ping-interval 15 \
+            --client-option enableReconnect=true \
+            --client-option reconnect=0 \
+            --client-option reconnectInterval=3 \
+            --client-option "theme=${ttyd_theme}" \
+            --client-option fontSize=14 \
+            "$launch_command"
+    else
+        # Compound command - needs bash -c
+        exec ttyd \
+            --port "${port}" \
+            --interface 0.0.0.0 \
+            --writable \
+            --ping-interval 15 \
+            --client-option enableReconnect=true \
+            --client-option reconnect=0 \
+            --client-option reconnectInterval=3 \
+            --client-option "theme=${ttyd_theme}" \
+            --client-option fontSize=14 \
+            bash -c "$launch_command"
+    fi
 }
 
 # Run health check
