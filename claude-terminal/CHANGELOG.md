@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.3
+
+### ✨ New Features
+
+- **Auto-cleanup of uploaded images**: Images in `/data/images/` older than 6 hours are automatically deleted. Runs every 30 minutes to prevent disk usage from growing unbounded. Configurable via the `IMAGE_MAX_AGE_HOURS` environment variable.
+
 ## 2.4.2
 
 ### 🔧 Bug Fixes

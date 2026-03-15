@@ -38,8 +38,33 @@ HOP_BY_HOP = frozenset({
 })
 
 
+IMAGE_MAX_AGE = int(os.environ.get('IMAGE_MAX_AGE_HOURS', 6)) * 3600  # seconds
+CLEANUP_INTERVAL = 30 * 60  # check every 30 minutes
+
+
 def log(msg):
     print(f'[image-service] {msg}', flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Image cleanup
+# ---------------------------------------------------------------------------
+
+async def cleanup_old_images(app):
+    """Periodically delete uploaded images older than IMAGE_MAX_AGE."""
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL)
+        try:
+            now = time.time()
+            removed = 0
+            for f in UPLOAD_DIR.iterdir():
+                if f.is_file() and (now - f.stat().st_mtime) > IMAGE_MAX_AGE:
+                    f.unlink()
+                    removed += 1
+            if removed:
+                log(f'Cleanup: removed {removed} image(s) older than {IMAGE_MAX_AGE // 3600}h')
+        except Exception as exc:
+            log(f'Cleanup error: {exc}')
 
 
 # ---------------------------------------------------------------------------
@@ -50,10 +75,13 @@ async def on_startup(app):
     # auto_decompress=False: pass raw bytes through without mangling
     # content-encoding & content-length stay consistent
     app['session'] = ClientSession(auto_decompress=False)
+    app['cleanup_task'] = asyncio.create_task(cleanup_old_images(app))
     log(f'Proxy ready — port {PORT} → ttyd :{TTYD_PORT}')
+    log(f'Image cleanup: every {CLEANUP_INTERVAL // 60}min, max age {IMAGE_MAX_AGE // 3600}h')
 
 
 async def on_cleanup(app):
+    app['cleanup_task'].cancel()
     await app['session'].close()
 
 
