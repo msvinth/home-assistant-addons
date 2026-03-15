@@ -187,6 +187,8 @@ async def terminal_proxy(request):
                 k: v for k, v in resp.headers.items()
                 if k.lower() not in HOP_BY_HOP
             }
+            # Allow clipboard access inside the terminal iframe
+            headers['Permissions-Policy'] = 'clipboard-read=*, clipboard-write=*'
             log(f'  → {resp.status} ({len(body)} bytes, ct={resp.content_type})')
             return web.Response(
                 body=body,
@@ -203,7 +205,9 @@ async def terminal_proxy(request):
 # ---------------------------------------------------------------------------
 
 async def index_handler(request):
-    return web.FileResponse(STATIC_DIR / 'index.html')
+    resp = web.FileResponse(STATIC_DIR / 'index.html')
+    resp.headers['Permissions-Policy'] = 'clipboard-read=*, clipboard-write=*'
+    return resp
 
 
 # ---------------------------------------------------------------------------

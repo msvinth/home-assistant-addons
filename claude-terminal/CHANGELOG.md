@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.0
+
+### 🔧 Bug Fixes
+
+- **Fix clipboard copy not working**: Click-to-copy on uploaded image paths and terminal text selection copy (Ctrl+C / Cmd+C) now work reliably inside HA Ingress
+  - Added `clipboard-read` / `clipboard-write` permissions to the terminal iframe
+  - Robust fallback copy using `execCommand` when the Clipboard API is blocked by the nested iframe context
+  - Injected clipboard bridge into the ttyd iframe so text selection copy reaches the system clipboard
+  - Added `Permissions-Policy` headers for clipboard access on proxied responses
+  - Last-resort `window.prompt()` fallback if all clipboard methods fail
+
 ## 2.3.4
 
 ### 🔧 Stability Fixes

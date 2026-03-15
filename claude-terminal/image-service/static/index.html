@@ -77,6 +77,28 @@
             background: #1a1b26;
         }
 
+        /* Copy toast notification */
+        #copy-toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #1e1f2e;
+            color: #9ece6a;
+            border: 1px solid #9ece6a;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 9999;
+        }
+        #copy-toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
         /* ---- Drag-drop overlay ---- */
         #drop-zone {
             position: absolute;
@@ -109,13 +131,14 @@
             </button>
         </div>
         <div id="terminal-container">
-            <iframe id="terminal-frame" src="terminal/"></iframe>
+            <iframe id="terminal-frame" src="terminal/" allow="clipboard-read; clipboard-write"></iframe>
             <div id="drop-zone">
                 <div id="drop-zone-text">Drop image here to upload</div>
             </div>
         </div>
     </div>
     <input type="file" id="file-input" accept="image/*">
+    <div id="copy-toast"></div>
 
     <script>
         // ---- Elements ----
@@ -124,6 +147,38 @@
         const fileInput = document.getElementById('file-input');
         const dropZone  = document.getElementById('drop-zone');
         const iframe    = document.getElementById('terminal-frame');
+
+        const copyToast = document.getElementById('copy-toast');
+
+        // ---- Robust clipboard copy with fallback ----
+        async function copyToClipboard(text) {
+            // Method 1: Modern Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (_) { /* fall through */ }
+            }
+            // Method 2: execCommand fallback (works in more iframe contexts)
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (ok) return true;
+            } catch (_) { /* fall through */ }
+            return false;
+        }
+
+        function showToast(msg) {
+            copyToast.textContent = msg;
+            copyToast.classList.add('visible');
+            setTimeout(() => copyToast.classList.remove('visible'), 2000);
+        }
 
         // ---- Status helper ----
         let statusTimer;
@@ -156,14 +211,18 @@
                     const p = result.path;
                     setStatus(`Saved: ${p}  (click to copy)`, 'success', true);
                     status.style.cursor = 'pointer';
-                    status.onclick = () => {
-                        navigator.clipboard.writeText(p).then(
-                            () => setStatus('Copied to clipboard!', 'success'),
-                            () => setStatus(p, 'success', true),
-                        );
+                    status.onclick = async () => {
+                        const ok = await copyToClipboard(p);
+                        if (ok) {
+                            showToast('Path copied to clipboard!');
+                            setStatus('Copied!', 'success');
+                        } else {
+                            // Last resort: show prompt so user can manually copy
+                            window.prompt('Copy this path:', p);
+                        }
                     };
                     // Also try putting path on clipboard automatically
-                    try { await navigator.clipboard.writeText(p); } catch (_) {}
+                    copyToClipboard(p).catch(() => {});
                 } else {
                     setStatus(result.error || 'Upload failed', 'error');
                 }
@@ -190,22 +249,42 @@
         // Listen on the outer document (covers paste when iframe is NOT focused)
         document.addEventListener('paste', handlePaste, true);
 
-        // Inject paste handler INTO the iframe so it works when the terminal has focus.
+        // Inject paste handler AND clipboard bridge INTO the iframe so it works
+        // when the terminal has focus.
         // Because both parent and iframe are served through HA ingress (same origin),
         // contentDocument access should succeed.
-        function injectIframePasteHandler() {
+        function injectIframeHandlers() {
             try {
-                const doc = iframe.contentDocument || iframe.contentWindow.document;
-                if (doc) {
-                    doc.addEventListener('paste', handlePaste, true);
-                }
+                const win = iframe.contentWindow;
+                const doc = win && (iframe.contentDocument || win.document);
+                if (!doc) return;
+
+                // 1. Paste handler for image uploads
+                doc.addEventListener('paste', handlePaste, true);
+
+                // 2. Clipboard bridge: override the iframe's clipboard API so
+                //    copy operations from xterm.js use the parent's fallback.
+                //    Also intercept Ctrl+C / Cmd+C on selected text.
+                doc.addEventListener('copy', (e) => {
+                    const sel = win.getSelection && win.getSelection();
+                    const text = sel ? sel.toString() : '';
+                    if (text) {
+                        e.preventDefault();
+                        // Set data on the event's clipboardData (works in most browsers)
+                        if (e.clipboardData) {
+                            e.clipboardData.setData('text/plain', text);
+                        }
+                        // Also use our robust fallback from the parent frame
+                        copyToClipboard(text);
+                    }
+                }, true);
             } catch (err) {
-                console.warn('Could not inject paste handler into terminal iframe:', err);
+                console.warn('Could not inject handlers into terminal iframe:', err);
             }
         }
-        iframe.addEventListener('load', injectIframePasteHandler);
+        iframe.addEventListener('load', injectIframeHandlers);
         // Retry injection after a short delay (ttyd may re-render after WS connects)
-        iframe.addEventListener('load', () => setTimeout(injectIframePasteHandler, 2000));
+        iframe.addEventListener('load', () => setTimeout(injectIframeHandlers, 2000));
 
         // ---- Upload button ----
         uploadBtn.addEventListener('click', () => fileInput.click());
