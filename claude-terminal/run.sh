@@ -310,6 +310,35 @@ get_claude_launch_command() {
 }
 
 
+# Start image upload service (lightweight Python proxy in front of ttyd)
+start_image_service() {
+    local image_port=7680
+    local ttyd_port=7681
+    local upload_dir="/data/images"
+
+    bashio::log.info "Starting image upload service on port ${image_port}..."
+
+    mkdir -p "${upload_dir}"
+    chmod 755 "${upload_dir}"
+
+    export IMAGE_SERVICE_PORT="${image_port}"
+    export TTYD_PORT="${ttyd_port}"
+    export UPLOAD_DIR="${upload_dir}"
+
+    if [ ! -f /opt/image-service/server.py ]; then
+        bashio::log.warning "Image service not found, skipping (terminal will work without image upload)"
+        return
+    fi
+
+    python3 /opt/image-service/server.py &
+    local pid=$!
+    bashio::log.info "Image service started (PID: ${pid})"
+
+    # Brief pause so the proxy is ready before ttyd starts
+    sleep 1
+}
+
+
 # Start main web terminal
 start_web_terminal() {
     local port=7681
@@ -319,6 +348,9 @@ start_web_terminal() {
     bashio::log.info "Environment variables:"
     bashio::log.info "ANTHROPIC_CONFIG_DIR=${ANTHROPIC_CONFIG_DIR}"
     bashio::log.info "HOME=${HOME}"
+
+    # Start image upload / paste service before ttyd
+    start_image_service
 
     # Get the appropriate launch command based on configuration
     local launch_spec

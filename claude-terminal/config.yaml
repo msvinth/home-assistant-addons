@@ -1,7 +1,7 @@
 ---
 name: "Claude Terminal"
 description: "Terminal interface for Anthropic's Claude Code CLI with persistent auth and packages"
-version: "2.2.1"
+version: "2.3.0"
 slug: "claude_terminal"
 init: false
 
@@ -16,16 +16,18 @@ url: "https://github.com/anthropics/claude-code"
 
 # Web interface configuration
 ingress: true
-ingress_port: 7681
+ingress_port: 7680
 panel_icon: mdi:code-braces
 panel_title: "Claude Terminal"
 panel_admin: true
 
 # Port configuration
 ports:
+  7680/tcp: 7680
   7681/tcp: 7681
 ports_description:
-  7681/tcp: "Web terminal (not required for ingress)"
+  7680/tcp: "Web interface with image upload (ingress entrypoint)"
+  7681/tcp: "ttyd terminal (internal, proxied by image service)"
 
 # Add-on configuration options
 options:
@@ -43,7 +45,7 @@ schema:
 
 # Volume mappings for file access
 map:
-  - config:rw    # Access to Home Assistant configuration files
+  - config:rw # Access to Home Assistant configuration files
 
 # API access for Home Assistant integration
 hassio_api: true
@@ -55,4 +57,4 @@ auth_api: true
 startup: services
 
 # Web UI access URL
-webui: http://[HOST]:[PORT:7681]/
+webui: http://[HOST]:[PORT:7680]/

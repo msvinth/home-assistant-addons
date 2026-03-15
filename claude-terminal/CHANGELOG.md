@@ -1,8 +1,21 @@
 # Changelog
 
+## 2.3.0
+
+### ✨ New Features
+
+- **Image paste support**: Paste screenshots directly into the terminal with Ctrl+V / Cmd+V
+  - Clipboard images are intercepted before xterm.js and uploaded automatically
+  - Images saved to `/data/images/` (persistent across restarts)
+  - File path shown in header bar and auto-copied to clipboard
+  - Also supports drag-and-drop and file upload button
+  - Lightweight Python proxy using aiohttp (no extra dependencies)
+  - Tell Claude: `analyze /data/images/pasted-1234567890.png`
+
 ## 2.2.1
 
 ### 🔧 Stability Fixes
+
 - **Auto-restart Claude on reconnect**: If Claude was killed (OOM, timeout) while you were away, it automatically restarts when you open the terminal again
   - No resources wasted — Claude only restarts when you actually reconnect
   - If Claude is still running, reconnect resumes the live session seamlessly
@@ -11,6 +24,7 @@
 ## 2.2.0
 
 ### 🔧 Stability Fixes
+
 - **Stable WebSocket connections**: Terminal sessions survive browser navigation and connection drops
   - tmux sessions persist through WebSocket disconnects (SIGHUP handled cleanly)
   - Automatic reattach on reconnect — no re-prompting or welcome screen replay
@@ -25,6 +39,7 @@
 ## 2.1.0
 
 ### ✨ New Features
+
 - **Smart Status Bar**: tmux status bar now shows live system indicators
   - Auth status: green when authenticated, red when credentials are missing
   - Home Assistant connection: green when connected, yellow on issues
@@ -36,6 +51,7 @@
   - Matching tmux pane borders and window status colors
 
 ### 🎨 Visual Improvements
+
 - Redesigned welcome banner with terracotta-accented borders and breathing room
 - Redesigned session picker banner with matching branded style
 - Dynamic version padding prevents box-drawing misalignment
@@ -44,6 +60,7 @@
 ## 2.0.0
 
 ### ✨ New Features
+
 - **HA Smart Context**: Claude automatically knows your Home Assistant setup
   - Generates a context file with system info, entity counts, installed add-ons, and recent errors
   - Claude Code loads this automatically — no configuration needed
@@ -56,15 +73,18 @@
   - Version tracking persisted across restarts
 
 ### 🎯 User Experience
+
 - Every Claude session now has context about your HA environment out of the box
 - Ask Claude about your entities, automations, or errors — it already knows
 
 ### 💙 Thank You
+
 To everyone who stuck with me through the v1.6–1.9 rough patch — the musl binary issues, the nested tmux errors, the auth helper breakage — thank you for your patience, your bug reports, and your trust. This release is dedicated to you. I heard every issue, and I'm committed to making Claude Terminal the best it can be.
 
 ## 1.9.0
 
 ### 🔄 Changed
+
 - **Reverted to npm installation**: Switched back from native installer to `npm install -g @anthropic-ai/claude-code`
   - Native binary requires musl 1.2.6+ (`posix_getdents` symbol), which Alpine 3.21 does not ship
   - npm installation runs on Node.js, avoiding all musl binary compatibility issues
@@ -74,6 +94,7 @@ To everyone who stuck with me through the v1.6–1.9 rough patch — the musl bi
 ## 1.7.0
 
 ### ✨ New Features
+
 - **Session Persistence with tmux** (#46): Claude sessions now survive browser navigation
   - Sessions persist when navigating away from the terminal in Home Assistant
   - New "Reconnect to existing session" option in session picker (option 0)
@@ -82,6 +103,7 @@ To everyone who stuck with me through the v1.6–1.9 rough patch — the musl bi
   - Contributed by [@petterl](https://github.com/petterl)
 
 ### 🛠️ Technical Details
+
 - Added tmux package to container
 - Custom tmux configuration optimized for web terminals:
   - Mouse mode intelligently disabled when using ttyd (prevents conflicts)
@@ -93,6 +115,7 @@ To everyone who stuck with me through the v1.6–1.9 rough patch — the musl bi
 - Automatic session cleanup and management
 
 ### 🎯 User Experience
+
 - No more lost work when switching between Home Assistant pages
 - Browser refresh no longer interrupts Claude conversations
 - Tab switching preserves full session state including history
@@ -101,6 +124,7 @@ To everyone who stuck with me through the v1.6–1.9 rough patch — the musl bi
 ## 1.6.1
 
 ### 🐛 Bug Fix - Native Install Path Mismatch
+
 - **Fixed "installMethod is native, but directory does not exist" error**: Claude binary now available at `$HOME/.local/bin/claude` at runtime
   - **Root cause**: Native installer places Claude at `/root/.local/bin/claude` during Docker build, but at runtime `HOME=/data/home`, so Claude's self-check looks in `/data/home/.local/bin/claude` which didn't exist
   - **Solution**: Symlink created from `/data/home/.local/bin/claude` → `/root/.local/bin/claude` on startup
@@ -110,6 +134,7 @@ To everyone who stuck with me through the v1.6–1.9 rough patch — the musl bi
 ## 1.6.0 - 2026-01-26
 
 ### 🔄 Changed
+
 - **Native Claude Code Installation**: Switched from npm package to official native installer
   - Uses `curl -fsSL https://claude.ai/install.sh | bash` instead of `npm install -g @anthropic-ai/claude-code`
   - Native binary provides automatic background updates from Anthropic
@@ -119,12 +144,14 @@ To everyone who stuck with me through the v1.6–1.9 rough patch — the musl bi
 - **Cleaner Dockerfile**: Removed npm retry/timeout configuration (no longer needed)
 
 ### 📦 Notes
+
 - Node.js and npm remain available as development tools
 - Existing authentication and configuration files are unaffected
 
 ## 1.5.0
 
 ### ✨ New Features
+
 - **Persistent Package Management** (#32): Install APK and pip packages that survive container restarts
   - New `persist-install` command for installing packages from the terminal
   - Configuration options: `persistent_apk_packages` and `persistent_pip_packages`
@@ -133,6 +160,7 @@ To everyone who stuck with me through the v1.6–1.9 rough patch — the musl bi
   - Inspired by community contribution from [@ESJavadex](https://github.com/ESJavadex)
 
 ### 📦 Usage Examples
+
 ```bash
 # Install APK packages persistently
 persist-install apk vim htop
@@ -148,7 +176,9 @@ persist-install remove apk vim
 ```
 
 ### 🛠️ Configuration
+
 Add to your add-on config to auto-install packages:
+
 ```yaml
 persistent_apk_packages:
   - vim
@@ -161,6 +191,7 @@ persistent_pip_packages:
 ## 1.4.1
 
 ### 🐛 Bug Fixes
+
 - **Actually include Python and development tools** (#30): Fixed Dockerfile to include tools documented in v1.4.0
   - Resolves #27 (Add git to container)
   - Resolves #29 (v1.4.0 missing Python and development tools)
@@ -169,6 +200,7 @@ persistent_pip_packages:
 ## 1.4.0
 
 ### ✨ New Features
+
 - **Added Python and development tools** (#26): Enhanced container with scripting and automation capabilities
   - **Python 3.11** with pip and commonly-used libraries (requests, aiohttp, yaml, beautifulsoup4)
   - **git** for version control
@@ -178,11 +210,13 @@ persistent_pip_packages:
   - **wget** and **netcat** for network operations
 
 ### 📦 Notes
+
 - Image size increased from ~300 MB to ~457 MB (+52%) to accommodate new tools
 
 ## 1.3.2
 
 ### 🐛 Bug Fixes
+
 - **Improved installation reliability** (#16): Enhanced resilience for network issues during installation
   - Added retry logic (3 attempts) for npm package installation
   - Configured npm with longer timeouts for slow/unstable connections
@@ -190,6 +224,7 @@ persistent_pip_packages:
   - Added 10-second delay between retry attempts
 
 ### 🛠️ Improvements
+
 - **Enhanced network diagnostics**: Better troubleshooting for connection issues
   - Added DNS resolution checks to identify network configuration problems
   - Check connectivity to GitHub Container Registry (ghcr.io)
@@ -204,6 +239,7 @@ persistent_pip_packages:
 ## 1.3.1
 
 ### 🐛 Critical Fix
+
 - **Restored config directory access**: Fixed regression where add-on couldn't access Home Assistant configuration files
   - Re-added `config:rw` volume mapping that was accidentally removed in 1.2.0
   - Users can now properly access and edit their configuration files again
@@ -211,6 +247,7 @@ persistent_pip_packages:
 ## 1.3.0
 
 ### ✨ New Features
+
 - **Full Home Assistant API Access**: Enabled complete API access for automations and entity control
   - Added `hassio_api`, `homeassistant_api`, and `auth_api` permissions
   - Set `hassio_role` to 'manager' for full Supervisor access
@@ -219,6 +256,7 @@ persistent_pip_packages:
   - Python and bash code examples for entity control
 
 ### 🐛 Bug Fixes
+
 - **Fixed authentication paste issues** (#14): Added authentication helper for clipboard problems
   - New authentication helper script with multiple input methods
   - Manual code entry option when clipboard paste fails
@@ -226,6 +264,7 @@ persistent_pip_packages:
   - Integrated into session picker as menu option
 
 ### 🛠️ Improvements
+
 - **Enhanced diagnostics** (#16): Added comprehensive health check system
   - System resource monitoring (memory, disk space)
   - Permission and dependency validation
@@ -236,12 +275,14 @@ persistent_pip_packages:
 ## 1.2.1
 
 ### 🔧 Internal Changes
+
 - Fixed YAML formatting issues for better compatibility
 - Added document start marker and fixed line lengths
 
 ## 1.2.0
 
 ### 🔒 Authentication Persistence Fix (PR #15)
+
 - **Fixed OAuth token persistence**: Tokens now survive container restarts
   - Switched from `/config` to `/data` directory (Home Assistant best practice)
   - Implemented XDG Base Directory specification compliance
@@ -252,18 +293,21 @@ persistent_pip_packages:
 ## 1.1.4
 
 ### 🧹 Maintenance
+
 - **Cleaned up repository**: Removed erroneously committed test files (thanks @lox!)
 - **Improved codebase hygiene**: Cleared unnecessary temporary and test configuration files
 
 ## 1.1.3
 
 ### 🐛 Bug Fixes
+
 - **Fixed session picker input capture**: Resolved issue with ttyd intercepting stdin, preventing proper user input
 - **Improved terminal interaction**: Session picker now correctly captures user choices in web terminal environment
 
 ## 1.1.2
 
 ### 🐛 Bug Fixes
+
 - **Fixed session picker input handling**: Improved compatibility with ttyd web terminal environment
 - **Enhanced input processing**: Better handling of user input with whitespace trimming
 - **Improved error messages**: Added debugging output showing actual invalid input values
@@ -271,7 +315,8 @@ persistent_pip_packages:
 
 ## 1.1.1
 
-### 🐛 Bug Fixes  
+### 🐛 Bug Fixes
+
 - **Fixed session picker not found**: Moved scripts from `/config/scripts/` to `/opt/scripts/` to avoid volume mapping conflicts
 - **Fixed authentication persistence**: Improved credential directory setup with proper symlink recreation
 - **Enhanced credential management**: Added proper file permissions (600) and logging for debugging
@@ -280,10 +325,11 @@ persistent_pip_packages:
 ## 1.1.0
 
 ### ✨ New Features
+
 - **Interactive Session Picker**: New menu-driven interface for choosing Claude session types
   - 🆕 New interactive session (default)
   - ⏩ Continue most recent conversation (-c)
-  - 📋 Resume from conversation list (-r) 
+  - 📋 Resume from conversation list (-r)
   - ⚙️ Custom Claude command with manual flags
   - 🐚 Drop to bash shell
   - ❌ Exit option
@@ -291,12 +337,14 @@ persistent_pip_packages:
 - **Added nano text editor**: Enables `/memory` functionality and general text editing
 
 ### 🛠️ Architecture Changes
+
 - **Simplified credential management**: Removed complex modular credential system
 - **Streamlined startup process**: Eliminated problematic background services
 - **Cleaner configuration**: Reduced complexity while maintaining functionality
 - **Improved reliability**: Removed sources of startup failures from missing script dependencies
 
 ### 🔧 Improvements
+
 - **Better startup logging**: More informative messages about configuration and setup
 - **Enhanced backward compatibility**: Existing users see no change in behavior by default
 - **Improved error handling**: Better fallback behavior when optional components are missing
@@ -304,12 +352,14 @@ persistent_pip_packages:
 ## 1.0.2
 
 ### 🔒 Security Fixes
+
 - **CRITICAL**: Fixed dangerous filesystem operations that could delete system files
 - Limited credential searches to safe directories only (`/root`, `/home`, `/tmp`, `/config`)
 - Replaced unsafe `find /` commands with targeted directory searches
 - Added proper exclusions and safety checks in cleanup scripts
 
 ### 🐛 Bug Fixes
+
 - **Fixed architecture mismatch**: Added missing `armv7` support to match build configuration
 - **Fixed NPM package installation**: Pinned Claude Code package version for reliable builds
 - **Fixed permission conflicts**: Standardized credential file permissions (600) across all scripts
@@ -317,6 +367,7 @@ persistent_pip_packages:
 - **Fixed script fallbacks**: Implemented embedded scripts when modules aren't found
 
 ### 🛠️ Improvements
+
 - Added comprehensive error handling for all critical operations
 - Improved build reliability with better package management
 - Enhanced credential management with consistent permission handling
@@ -324,6 +375,7 @@ persistent_pip_packages:
 - Improved startup logging for better debugging
 
 ### 🧪 Development
+
 - Updated development environment to use Podman instead of Docker
 - Added proper build arguments for local testing
 - Created comprehensive testing framework with Nix development shell

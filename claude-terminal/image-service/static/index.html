@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Terminal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1b26;
+            color: #c0caf5;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ---- Header bar ---- */
+        #header {
+            background: #1e1f2e;
+            padding: 4px 12px;
+            border-bottom: 1px solid #33467c;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-shrink: 0;
+            height: 32px;
+        }
+
+        #status {
+            font-size: 12px;
+            color: #565f89;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60%;
+            transition: color 0.2s;
+            cursor: default;
+        }
+        #status.success { color: #9ece6a; }
+        #status.error   { color: #f7768e; }
+
+        .hdr-btn {
+            background: none;
+            color: #565f89;
+            border: 1px solid #33467c;
+            padding: 2px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+        .hdr-btn:hover { color: #c0caf5; border-color: #7aa2f7; }
+        .hdr-btn:active { background: #33467c; }
+
+        /* ---- Terminal iframe ---- */
+        #terminal-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #terminal-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #1a1b26;
+        }
+
+        /* ---- Drag-drop overlay ---- */
+        #drop-zone {
+            position: absolute;
+            inset: 0;
+            background: rgba(122, 162, 247, 0.15);
+            border: 3px dashed #7aa2f7;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        #drop-zone.active { display: flex; }
+        #drop-zone-text {
+            font-size: 20px;
+            font-weight: 500;
+            color: #7aa2f7;
+        }
+
+        /* Hidden file input */
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <span id="status"></span>
+            <button id="upload-btn" class="hdr-btn" title="Upload an image for Claude to analyze">
+                <span>&#x1F4CE;</span><span>Upload Image</span>
+            </button>
+        </div>
+        <div id="terminal-container">
+            <iframe id="terminal-frame" src="terminal/"></iframe>
+            <div id="drop-zone">
+                <div id="drop-zone-text">Drop image here to upload</div>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="file-input" accept="image/*">
+
+    <script>
+        // ---- Elements ----
+        const status    = document.getElementById('status');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileInput = document.getElementById('file-input');
+        const dropZone  = document.getElementById('drop-zone');
+        const iframe    = document.getElementById('terminal-frame');
+
+        // ---- Status helper ----
+        let statusTimer;
+        function setStatus(msg, cls, persistent) {
+            clearTimeout(statusTimer);
+            status.textContent = msg;
+            status.className = cls || '';
+            if (msg && !persistent) {
+                statusTimer = setTimeout(() => { status.textContent = ''; status.className = ''; }, 6000);
+            }
+        }
+
+        // ---- Upload an image file ----
+        async function uploadImage(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                setStatus('Not an image file', 'error');
+                return;
+            }
+            setStatus('Uploading…', '');
+            const form = new FormData();
+            form.append('image', file);
+            try {
+                const resp = await fetch('upload', { method: 'POST', body: form });
+                if (!resp.ok) {
+                    const body = await resp.json().catch(() => ({}));
+                    throw new Error(body.error || `HTTP ${resp.status}`);
+                }
+                const result = await resp.json();
+                if (result.success) {
+                    const p = result.path;
+                    setStatus(`Saved: ${p}  (click to copy)`, 'success', true);
+                    status.style.cursor = 'pointer';
+                    status.onclick = () => {
+                        navigator.clipboard.writeText(p).then(
+                            () => setStatus('Copied to clipboard!', 'success'),
+                            () => setStatus(p, 'success', true),
+                        );
+                    };
+                    // Also try putting path on clipboard automatically
+                    try { await navigator.clipboard.writeText(p); } catch (_) {}
+                } else {
+                    setStatus(result.error || 'Upload failed', 'error');
+                }
+            } catch (err) {
+                setStatus('Upload failed: ' + err.message, 'error');
+            }
+        }
+
+        // ---- Paste handler (works for images; text falls through) ----
+        function handlePaste(e) {
+            const items = e.clipboardData && e.clipboardData.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    uploadImage(item.getAsFile());
+                    return;
+                }
+            }
+            // Not an image → let xterm.js handle text paste normally
+        }
+
+        // Listen on the outer document (covers paste when iframe is NOT focused)
+        document.addEventListener('paste', handlePaste, true);
+
+        // Inject paste handler INTO the iframe so it works when the terminal has focus.
+        // Because both parent and iframe are served through HA ingress (same origin),
+        // contentDocument access should succeed.
+        function injectIframePasteHandler() {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                if (doc) {
+                    doc.addEventListener('paste', handlePaste, true);
+                }
+            } catch (err) {
+                console.warn('Could not inject paste handler into terminal iframe:', err);
+            }
+        }
+        iframe.addEventListener('load', injectIframePasteHandler);
+        // Retry injection after a short delay (ttyd may re-render after WS connects)
+        iframe.addEventListener('load', () => setTimeout(injectIframePasteHandler, 2000));
+
+        // ---- Upload button ----
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) uploadImage(e.target.files[0]);
+            fileInput.value = '';
+        });
+
+        // ---- Drag & drop ----
+        let dragCounter = 0;
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            if (++dragCounter === 1) dropZone.classList.add('active');
+        });
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (--dragCounter === 0) dropZone.classList.remove('active');
+        });
+        document.addEventListener('dragover', (e) => e.preventDefault());
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropZone.classList.remove('active');
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length) {
+                const file = files[0];
+                if (file.type.startsWith('image/')) uploadImage(file);
+                else setStatus('Not an image file', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

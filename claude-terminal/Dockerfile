@@ -30,6 +30,9 @@ RUN npm install -g @anthropic-ai/claude-code@latest \
 RUN mkdir -p /config/claude-config
 WORKDIR /config
 
+# Copy image upload service (uses aiohttp which is already installed via py3-aiohttp)
+COPY image-service/ /opt/image-service/
+
 # Copy startup script, modular scripts, and changelog
 COPY run.sh /run.sh
 COPY scripts/ /opt/scripts/
