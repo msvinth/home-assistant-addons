@@ -35,6 +35,11 @@ init_environment() {
     export ANTHROPIC_CONFIG_DIR="$claude_config_dir"
     export ANTHROPIC_HOME="/data"
 
+    # Cap Node.js heap to avoid OOM kills on memory-constrained systems.
+    # Claude Code runs fine at 256 MB; the default V8 heap (~1.5 GB) is far
+    # too large for typical HA hosts with ≤1 GB RAM.
+    export NODE_OPTIONS="--max-old-space-size=256"
+
     # Migrate any existing authentication files from legacy locations
     migrate_legacy_auth_files "$claude_config_dir"
 
@@ -96,14 +101,24 @@ migrate_legacy_auth_files() {
     fi
 }
 
-# Install required tools
+# Verify required tools are available (installed at build time via Dockerfile)
 install_tools() {
-    bashio::log.info "Installing additional tools..."
-    if ! apk add --no-cache ttyd jq curl tmux; then
-        bashio::log.error "Failed to install required tools"
+    bashio::log.info "Verifying required tools..."
+    local missing=0
+    for cmd in ttyd jq curl tmux; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            bashio::log.warning "${cmd} not found, attempting install..."
+            if ! apk add --no-cache "$cmd"; then
+                bashio::log.error "Failed to install ${cmd}"
+                missing=1
+            fi
+        fi
+    done
+    if [ "$missing" -eq 1 ]; then
+        bashio::log.error "Some required tools are missing"
         exit 1
     fi
-    bashio::log.info "Tools installed successfully"
+    bashio::log.info "All required tools available"
 }
 
 # Install persistent packages from config and saved state

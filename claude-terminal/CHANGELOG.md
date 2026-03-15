@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.3
+
+### 🔧 Stability Fixes
+
+- **Fix Claude being OOM-killed on low-memory hosts**: Cap Node.js heap to 256 MB (`--max-old-space-size=256`) so Claude Code doesn't exceed available RAM on typical HA systems with ≤1 GB memory. The default V8 heap (~1.5 GB) triggered the Linux OOM killer almost immediately.
+- **Reduce startup memory footprint**: Move ttyd installation to the Docker image (build time) instead of installing at every container start. Eliminates runtime `apk` overhead on memory-constrained systems.
+
 ## 2.3.2
 
 ### 🔧 Stability Fixes
