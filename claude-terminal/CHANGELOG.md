@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.1
+
+### 🔧 Bug Fixes
+
+- **Fix auto-copy on text selection in terminal**: xterm.js shows a brief copy icon when selecting text but the clipboard write silently failed in HA Ingress. Now monkey-patches `navigator.clipboard.writeText` inside the ttyd iframe to route through the parent frame's robust clipboard fallback. Select-to-copy now works without needing right-click.
+
 ## 2.4.0
 
 ### 🔧 Bug Fixes

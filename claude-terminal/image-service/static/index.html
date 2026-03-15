@@ -262,19 +262,30 @@
                 // 1. Paste handler for image uploads
                 doc.addEventListener('paste', handlePaste, true);
 
-                // 2. Clipboard bridge: override the iframe's clipboard API so
-                //    copy operations from xterm.js use the parent's fallback.
-                //    Also intercept Ctrl+C / Cmd+C on selected text.
+                // 2. Monkey-patch navigator.clipboard.writeText inside the iframe.
+                //    xterm.js (ttyd) calls this directly on text selection — it
+                //    fails silently in a nested HA Ingress iframe. Redirect it
+                //    through the parent frame's robust copyToClipboard().
+                if (win.navigator && win.navigator.clipboard) {
+                    const origWrite = win.navigator.clipboard.writeText.bind(win.navigator.clipboard);
+                    win.navigator.clipboard.writeText = async (text) => {
+                        const ok = await copyToClipboard(text);
+                        if (!ok) {
+                            // Fall back to the original in case it works
+                            return origWrite(text);
+                        }
+                    };
+                }
+
+                // 3. Also intercept the copy event (Ctrl+C / Cmd+C) as a safety net.
                 doc.addEventListener('copy', (e) => {
                     const sel = win.getSelection && win.getSelection();
                     const text = sel ? sel.toString() : '';
                     if (text) {
                         e.preventDefault();
-                        // Set data on the event's clipboardData (works in most browsers)
                         if (e.clipboardData) {
                             e.clipboardData.setData('text/plain', text);
                         }
-                        // Also use our robust fallback from the parent frame
                         copyToClipboard(text);
                     }
                 }, true);
