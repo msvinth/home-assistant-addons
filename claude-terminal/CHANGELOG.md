@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.2
+
+### 🔧 Stability Fixes
+
+- **Fix Claude sessions being killed every ~22 seconds**: Two issues combined to make sessions unstable:
+  1. **HA Ingress idle timeout** (pre-existing since v2.2.0): HA's reverse proxy drops idle WebSocket connections. Now the proxy sends periodic pings to the browser (every 20s) to keep the Ingress connection alive.
+  2. **Proxy not responding to ttyd pings** (introduced in v2.3.0): The image-service proxy used `autoping=False`, so ttyd's PING frames never got a PONG reply — ttyd closed the connection after its pong timeout. Now properly auto-responds to pings on both sides.
+
 ## 2.3.0
 
 ### ✨ New Features

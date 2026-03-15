@@ -107,7 +107,9 @@ async def handle_upload(request):
 
 async def ws_proxy(request, path='ws'):
     """Bidirectional WebSocket proxy to ttyd."""
-    ws_up = web.WebSocketResponse(protocols=['tty'])
+    # heartbeat sends periodic pings to the browser, keeping the
+    # HA Ingress reverse-proxy connection alive.
+    ws_up = web.WebSocketResponse(protocols=['tty'], heartbeat=20.0)
     await ws_up.prepare(request)
 
     qs = request.query_string
@@ -117,7 +119,7 @@ async def ws_proxy(request, path='ws'):
     session = request.app['session']
     try:
         async with session.ws_connect(
-            ws_url, protocols=['tty'], autoping=False,
+            ws_url, protocols=['tty'], heartbeat=30.0,
         ) as ws_down:
             async def forward(src, dst):
                 async for msg in src:
