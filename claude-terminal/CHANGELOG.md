@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.1
+
+### 🔧 Stability Fixes
+- **Auto-restart Claude on reconnect**: If Claude was killed (OOM, timeout) while you were away, it automatically restarts when you open the terminal again
+  - No resources wasted — Claude only restarts when you actually reconnect
+  - If Claude is still running, reconnect resumes the live session seamlessly
+  - If you intentionally exited Claude, bash shell is preserved (no forced restart)
+
 ## 2.2.0
 
 ### 🔧 Stability Fixes
