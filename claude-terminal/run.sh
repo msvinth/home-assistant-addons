@@ -330,7 +330,7 @@ start_image_service() {
         return
     fi
 
-    python3 /opt/image-service/server.py &
+    PYTHONUNBUFFERED=1 python3 /opt/image-service/server.py 2>&1 &
     local pid=$!
     bashio::log.info "Image service started (PID: ${pid})"
 

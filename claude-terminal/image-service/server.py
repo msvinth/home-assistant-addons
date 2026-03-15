@@ -9,6 +9,7 @@ Lightweight aiohttp server (no extra deps — py3-aiohttp is pre-installed) that
 
 import asyncio
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -28,13 +29,28 @@ EXT_MAP = {
 }
 STATIC_DIR = Path(__file__).parent / 'static'
 
+# Hop-by-hop headers that must NOT be forwarded through a proxy
+HOP_BY_HOP = frozenset({
+    'transfer-encoding', 'connection', 'keep-alive',
+    'upgrade', 'proxy-authorization', 'proxy-authenticate', 'te', 'trailers',
+    # Also skip content-length — let aiohttp recalculate from the actual body
+    'content-length',
+})
+
+
+def log(msg):
+    print(f'[image-service] {msg}', flush=True)
+
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown hooks
 # ---------------------------------------------------------------------------
 
 async def on_startup(app):
-    app['session'] = ClientSession()
+    # auto_decompress=False: pass raw bytes through without mangling
+    # content-encoding & content-length stay consistent
+    app['session'] = ClientSession(auto_decompress=False)
+    log(f'Proxy ready — port {PORT} → ttyd :{TTYD_PORT}')
 
 
 async def on_cleanup(app):
@@ -96,16 +112,23 @@ async def ws_proxy(request, path='ws'):
 
     qs = request.query_string
     ws_url = f'ws://127.0.0.1:{TTYD_PORT}/{path}{"?" + qs if qs else ""}'
+    log(f'WS proxy → {ws_url}')
 
     session = request.app['session']
     try:
-        async with session.ws_connect(ws_url, protocols=['tty']) as ws_down:
+        async with session.ws_connect(
+            ws_url, protocols=['tty'], autoping=False,
+        ) as ws_down:
             async def forward(src, dst):
                 async for msg in src:
                     if msg.type == WSMsgType.BINARY:
                         await dst.send_bytes(msg.data)
                     elif msg.type == WSMsgType.TEXT:
                         await dst.send_str(msg.data)
+                    elif msg.type == WSMsgType.PING:
+                        await dst.ping(msg.data)
+                    elif msg.type == WSMsgType.PONG:
+                        await dst.pong(msg.data)
                     elif msg.type in (
                         WSMsgType.CLOSE, WSMsgType.CLOSING, WSMsgType.ERROR,
                     ):
@@ -121,7 +144,7 @@ async def ws_proxy(request, path='ws'):
             for task in pending:
                 task.cancel()
     except Exception as exc:
-        print(f'[image-service] WebSocket proxy error: {exc}')
+        log(f'WSocket proxy error: {exc}')
 
     return ws_up
 
@@ -143,6 +166,8 @@ async def terminal_proxy(request):
     if request.query_string:
         url += f'?{request.query_string}'
 
+    log(f'HTTP {request.method} /terminal/{path} → {url}')
+
     session = request.app['session']
     try:
         async with session.request(
@@ -150,23 +175,24 @@ async def terminal_proxy(request):
             url,
             headers={
                 k: v for k, v in request.headers.items()
-                if k.lower() not in ('host', 'connection', 'upgrade')
+                if k.lower() not in HOP_BY_HOP and k.lower() != 'host'
             },
             data=await request.read(),
+            allow_redirects=False,
         ) as resp:
-            skip = frozenset({
-                'transfer-encoding', 'connection', 'content-encoding',
-            })
+            body = await resp.read()
             headers = {
                 k: v for k, v in resp.headers.items()
-                if k.lower() not in skip
+                if k.lower() not in HOP_BY_HOP
             }
+            log(f'  → {resp.status} ({len(body)} bytes, ct={resp.content_type})')
             return web.Response(
-                body=await resp.read(),
+                body=body,
                 status=resp.status,
                 headers=headers,
             )
     except Exception as exc:
+        log(f'Proxy error for /terminal/{path}: {exc}')
         return web.Response(text=f'Terminal not ready: {exc}', status=502)
 
 
@@ -197,10 +223,10 @@ def create_app():
 
 
 if __name__ == '__main__':
-    print(f'[image-service] port {PORT} → ttyd :{TTYD_PORT}')
+    log(f'Starting — port {PORT} → ttyd :{TTYD_PORT}')
     web.run_app(
         create_app(),
         host='0.0.0.0',
         port=PORT,
-        print=lambda s: print(f'[image-service] {s}'),
+        print=lambda s: log(s),
     )
