@@ -36,9 +36,24 @@ init_environment() {
     export ANTHROPIC_HOME="/data"
 
     # Cap Node.js heap to avoid OOM kills on memory-constrained systems.
-    # Claude Code runs fine at 256 MB; the default V8 heap (~1.5 GB) is far
-    # too large for typical HA hosts with ≤1 GB RAM.
-    export NODE_OPTIONS="--max-old-space-size=256"
+    # Dynamically size based on available memory, leaving room for the OS,
+    # Python image service (~30 MB), tmux, ttyd, and other HA services.
+    local mem_avail_mb
+    mem_avail_mb=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+    local heap_mb=256  # default
+
+    if [ "$mem_avail_mb" -lt 200 ]; then
+        heap_mb=64
+        bashio::log.warning "Very low memory (${mem_avail_mb}MB available) — Node.js heap capped to ${heap_mb}MB"
+        bashio::log.warning "Claude Code may struggle. Consider freeing memory by disabling other add-ons."
+    elif [ "$mem_avail_mb" -lt 400 ]; then
+        heap_mb=128
+        bashio::log.info "Low memory (${mem_avail_mb}MB available) — Node.js heap capped to ${heap_mb}MB"
+    else
+        bashio::log.info "Memory OK (${mem_avail_mb}MB available) — Node.js heap set to ${heap_mb}MB"
+    fi
+
+    export NODE_OPTIONS="--max-old-space-size=${heap_mb}"
 
     # Migrate any existing authentication files from legacy locations
     migrate_legacy_auth_files "$claude_config_dir"

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.4
+
+### 🔧 Stability Fixes
+
+- **Dynamic Node.js heap sizing**: Automatically detect available memory and cap the heap accordingly (64/128/256 MB). Previous fixed 256 MB cap was still too large when the system-wide OOM killer fires due to exhausted RAM+swap.
+
 ## 2.3.3
 
 ### 🔧 Stability Fixes
