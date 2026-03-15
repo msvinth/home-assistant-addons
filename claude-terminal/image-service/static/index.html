@@ -262,22 +262,47 @@
                 // 1. Paste handler for image uploads
                 doc.addEventListener('paste', handlePaste, true);
 
-                // 2. Monkey-patch navigator.clipboard.writeText inside the iframe.
-                //    xterm.js (ttyd) calls this directly on text selection — it
-                //    fails silently in a nested HA Ingress iframe. Redirect it
-                //    through the parent frame's robust copyToClipboard().
-                if (win.navigator && win.navigator.clipboard) {
-                    const origWrite = win.navigator.clipboard.writeText.bind(win.navigator.clipboard);
-                    win.navigator.clipboard.writeText = async (text) => {
-                        const ok = await copyToClipboard(text);
-                        if (!ok) {
-                            // Fall back to the original in case it works
-                            return origWrite(text);
-                        }
-                    };
-                }
+                // 2. Clipboard bridge — multiple strategies because
+                //    navigator.clipboard is often broken inside nested iframes
+                //    served through HA Ingress.
 
-                // 3. Also intercept the copy event (Ctrl+C / Cmd+C) as a safety net.
+                // Strategy A: Patch Clipboard.prototype.writeText so ANY call
+                // (including xterm.js internals) goes through our fallback.
+                try {
+                    if (win.Clipboard && win.Clipboard.prototype) {
+                        const origProto = win.Clipboard.prototype.writeText;
+                        win.Clipboard.prototype.writeText = function(text) {
+                            return copyToClipboard(text).then(ok => {
+                                if (!ok) return origProto.call(this, text);
+                            });
+                        };
+                    }
+                } catch (_) {}
+
+                // Strategy B: Also patch the instance directly
+                try {
+                    if (win.navigator && win.navigator.clipboard) {
+                        win.navigator.clipboard.writeText = (text) => {
+                            return copyToClipboard(text);
+                        };
+                    }
+                } catch (_) {}
+
+                // Strategy C: On mouseup, grab any selected text and copy it.
+                // This is the most reliable approach — xterm.js selects text on
+                // drag, and when the user releases the mouse we copy whatever
+                // is selected. Small delay lets xterm.js finish its selection.
+                doc.addEventListener('mouseup', () => {
+                    setTimeout(() => {
+                        const sel = win.getSelection ? win.getSelection() : null;
+                        const text = sel ? sel.toString() : '';
+                        if (text) {
+                            copyToClipboard(text);
+                        }
+                    }, 50);
+                });
+
+                // Strategy D: Intercept Ctrl+C / Cmd+C copy events.
                 doc.addEventListener('copy', (e) => {
                     const sel = win.getSelection && win.getSelection();
                     const text = sel ? sel.toString() : '';
@@ -294,8 +319,9 @@
             }
         }
         iframe.addEventListener('load', injectIframeHandlers);
-        // Retry injection after a short delay (ttyd may re-render after WS connects)
+        // Retry injection after delays — ttyd rebuilds the DOM after WS connects
         iframe.addEventListener('load', () => setTimeout(injectIframeHandlers, 2000));
+        iframe.addEventListener('load', () => setTimeout(injectIframeHandlers, 5000));
 
         // ---- Upload button ----
         uploadBtn.addEventListener('click', () => fileInput.click());

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.4.2
+
+### 🔧 Bug Fixes
+
+- **Fix select-to-copy in terminal**: Previous monkey-patch of `navigator.clipboard.writeText` didn't work in the HA Ingress iframe context. Now uses a multi-strategy approach:
+  - Patches `Clipboard.prototype.writeText` (catches all callers including xterm.js internals)
+  - Listens for `mouseup` inside the iframe and copies any selected text via the parent frame — most reliable fallback
+  - Retries handler injection at 2s and 5s after iframe load (ttyd rebuilds DOM after WebSocket connects)
+
 ## 2.4.1
 
 ### 🔧 Bug Fixes
