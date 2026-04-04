@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.0
+
+### ✨ New Features
+
+- **Home Assistant MCP integration**: Synced with upstream — Claude Code now has native Home Assistant integration via bundled ha-mcp server with 97+ tools for entity control, automations, scripts, dashboards, and more
+
 ## 2.4.3
 
 ### ✨ New Features
