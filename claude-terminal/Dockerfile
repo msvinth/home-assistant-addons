@@ -28,8 +28,10 @@ RUN npm install -g @anthropic-ai/claude-code@latest \
     && npm cache clean --force
 
 # Install uv for running ha-mcp (Python package manager/runner)
-# ha-mcp requires Python 3.13+, uv handles this automatically
-RUN apk add --no-cache uv
+# ha-mcp requires Python 3.13+ (pydantic-core wheels need cp313)
+# Alpine ships Python 3.12, so we use uv to fetch Python 3.13 at build time
+RUN apk add --no-cache uv \
+    && uv python install 3.13
 
 # Create directory for Claude configuration and set working directory
 RUN mkdir -p /config/claude-config

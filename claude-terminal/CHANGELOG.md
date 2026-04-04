@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.1
+
+### 🔧 Bug Fixes
+
+- **Fix ha-mcp failing to start**: ha-mcp@3.5.1 requires pydantic-core wheels for Python 3.13 (cp313), but Alpine ships Python 3.12. Now explicitly uses `uvx --python 3.13` and pre-installs Python 3.13 at build time via `uv python install 3.13`.
+
 ## 2.5.0
 
 ### ✨ New Features
@@ -83,6 +89,7 @@
 ## 2.2.0
 
 ### ✨ New Features
+
 - **Bundled Home Assistant MCP Server** (#48): Claude Code now has native Home Assistant integration
   - Switched to [homeassistant-ai/ha-mcp](https://github.com/homeassistant-ai/ha-mcp) - the comprehensive HA MCP server
   - 97+ tools for entity control, automations, scripts, dashboards, history, and more
@@ -105,22 +112,28 @@
 - **Welcome screen improvements**: Auto-continues after 15s timeout, fixed box alignment
 
 ### 🛠️ Configuration
+
 Enable or disable the Home Assistant MCP integration in your add-on config:
+
 ```yaml
-enable_ha_mcp: true  # default
+enable_ha_mcp: true # default
 ```
 
 ### 📦 Technical Details
+
 - Uses `uvx ha-mcp@3.5.1` for automatic package management and Python version handling
 - Installed [uv](https://github.com/astral-sh/uv) via Alpine package for fast Python package execution
 - MCP server connects to Home Assistant via internal Supervisor API (`http://supervisor/core`)
 - Authentication uses the add-on's Supervisor token automatically
 
 ### 🔒 Security Note
+
 The ha-mcp integration gives Claude extensive control over your Home Assistant instance, including the ability to control devices, modify automations, and access history data. You can disable it at any time by setting `enable_ha_mcp: false`.
 
 ### 💬 Example Usage
+
 Once configured, you can ask Claude things like:
+
 - "What's the current state of my thermostat?"
 - "Turn on the porch lights"
 - "Create an automation that turns on the coffee maker at 7 AM"
