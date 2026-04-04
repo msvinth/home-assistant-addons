@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.5.2
+
+### 🔧 Bug Fixes
+
+- **Fix ha-mcp pydantic-core wheel resolution**: The HA base image configures a custom wheel index (`wheels.home-assistant.io`) that only has cp312 musl wheels. Added `--no-config` to `uvx` calls so pydantic-core cp313 musllinux wheels are fetched from PyPI instead.
+- **Upgrade ha-mcp to latest**: Removed the pin to `ha-mcp@3.5.1` — now installs the latest version (v7.2.0+, 92+ tools).
+- **Pre-warm ha-mcp at build time**: Run `uvx --no-config --python 3.13 ha-mcp` during Docker build to cache all dependencies, avoiding slow first-launch installs.
+
 ## 2.5.1
 
 ### 🔧 Bug Fixes
