@@ -28,13 +28,9 @@ RUN npm install -g @anthropic-ai/claude-code@latest \
     && npm cache clean --force
 
 # Install uv for running ha-mcp (Python package manager/runner)
-# ha-mcp requires Python 3.13+ (pydantic-core wheels need cp313)
-# Alpine ships Python 3.12, so we use uv to fetch a musl-compatible Python 3.13
-# --no-config prevents uv from using HA base image pip config (wheels.home-assistant.io
-# only has cp312 musl wheels; PyPI has cp313 musllinux wheels for pydantic-core)
-RUN apk add --no-cache uv \
-    && uv python install 3.13 \
-    && uvx --no-config --python 3.13 ha-mcp --help > /dev/null 2>&1 || true
+# --index-strategy unsafe-best-match lets uvx combine the HA wheel index
+# (which has aarch64 pydantic-core wheels) with PyPI for everything else
+RUN apk add --no-cache uv
 
 # Create directory for Claude configuration and set working directory
 RUN mkdir -p /config/claude-config

@@ -42,19 +42,18 @@ configure_ha_mcp_server() {
     # Environment variables:
     #   HOMEASSISTANT_URL: Internal Supervisor API endpoint
     #   HOMEASSISTANT_TOKEN: Supervisor token for authentication
-    # Note: --no-config prevents uvx from using the HA base image's pip/uv config
-    # which points to wheels.home-assistant.io (only has cp312 musl wheels).
-    # This ensures pydantic-core cp313 wheels are fetched from PyPI.
+    # --index-strategy unsafe-best-match: lets uvx resolve pydantic-core from the
+    # HA wheel index (has aarch64 builds) while pulling everything else from PyPI
     if claude mcp add home-assistant \
         --env "HOMEASSISTANT_URL=http://supervisor/core" \
         --env "HOMEASSISTANT_TOKEN=${SUPERVISOR_TOKEN}" \
-        -- uvx --no-config --python 3.13 ha-mcp; then
+        -- uvx --index-strategy unsafe-best-match --python 3.12 ha-mcp; then
         bashio::log.info "ha-mcp configured successfully!"
         bashio::log.info "Claude Code now has access to Home Assistant via MCP"
         bashio::log.info "Available tools: entity control, automations, scripts, dashboards, history, and more"
     else
         bashio::log.warning "Failed to configure ha-mcp - continuing without MCP integration"
-        bashio::log.warning "You can manually run: claude mcp add home-assistant --env HOMEASSISTANT_URL=http://supervisor/core --env HOMEASSISTANT_TOKEN=\$SUPERVISOR_TOKEN -- uvx --no-config --python 3.13 ha-mcp"
+        bashio::log.warning "You can manually run: claude mcp add home-assistant --env HOMEASSISTANT_URL=http://supervisor/core --env HOMEASSISTANT_TOKEN=\$SUPERVISOR_TOKEN -- uvx --index-strategy unsafe-best-match --python 3.12 ha-mcp"
     fi
 }
 

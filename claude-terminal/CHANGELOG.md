@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.3
+
+### 🔧 Bug Fixes
+
+- **Fix ha-mcp on aarch64**: Use system Python 3.12 instead of trying to install Python 3.13 (which isn't available on HA OS aarch64). Added `--index-strategy unsafe-best-match` so uvx can resolve pydantic-core from the HA wheel index (which has aarch64 builds) while pulling other packages from PyPI.
+- **Remove unnecessary Python 3.13 install**: Removed `uv python install 3.13` from Dockerfile — not needed and added build time.
+
 ## 2.5.2
 
 ### 🔧 Bug Fixes
